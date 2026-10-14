@@ -48,7 +48,7 @@ It uses a throwaway config and data directory, so your real GNOME settings and e
 ## Credits and notes
 
 - The Apple Accessory Protocol work and the daemon are by the [LinuxPods](https://github.com/Explor3Universe/LinuxPods) authors. GnomePods is an independent project and is not affiliated with them.
-- The icons in `extension/icons/` are original drawings made for this project.
+- The symbolic panel icons in `extension/icons/` and product renders in `extension/images/` are original artwork made for this project. The noise and switch PNGs are transparent crops from the supplied GnomePods design reference.
 - AirPods is a trademark of Apple Inc. GnomePods is not affiliated with or endorsed by Apple.
 
 ## License

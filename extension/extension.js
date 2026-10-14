@@ -2,6 +2,7 @@
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import Pango from 'gi://Pango';
 import Gio from 'gi://Gio';
 import St from 'gi://St';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
@@ -12,7 +13,12 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 const BUS = 'io.github.Explor3Universe.LinuxPods';
 const PATH = '/io/github/Explor3Universe/LinuxPods';
 const IFACE = 'io.github.Explor3Universe.LinuxPods.Manager';
-const MODES = [['Off', 0], ['Noise Cancel', 1], ['Transparency', 2], ['Adaptive', 3]];
+const MODES = [
+    {label: 'Off', id: 0, image: 'noise-off.png'},
+    {label: 'Noise Cancellation', id: 1, image: 'noise-anc.png'},
+    {label: 'Transparency', id: 2, image: 'noise-transparency.png'},
+    {label: 'Adaptive', id: 3, image: 'noise-adaptive.png'},
+];
 const POLL_SECONDS = 10;
 const CALL_TIMEOUT_MS = 3000;
 const BAR_WIDTH = 64;
@@ -20,12 +26,12 @@ const LOW_BATTERY = 20;
 
 const Indicator = GObject.registerClass(
 class Indicator extends PanelMenu.Button {
-    _init(iconDir) {
+    _init(iconDir, imageDir) {
         super._init(0.0, 'LinuxPods');
         this._destroyed = false;
-        this._updating = false;
         this._props = {};
         this._iconDir = iconDir;
+        this._imageDir = imageDir;
 
         this._buildPanel();
         this._buildMenu();
@@ -52,6 +58,11 @@ class Indicator extends PanelMenu.Button {
         return new St.Icon({gicon: Gio.FileIcon.new(file), style_class: styleClass});
     }
 
+    _image(name, styleClass) {
+        const file = Gio.File.new_for_path(`${this._imageDir}/${name}`);
+        return new St.Icon({gicon: Gio.FileIcon.new(file), style_class: styleClass});
+    }
+
     _buildPanel() {
         const box = new St.BoxLayout({style_class: 'panel-status-menu-box'});
         this._panelIcon = this._icon('airpods', 'system-status-icon lp-panel-icon');
@@ -62,10 +73,10 @@ class Indicator extends PanelMenu.Button {
     }
 
     _buildMenu() {
-        // Header: icon, device name, status line.
+        // Header: pair icon, device name, status line.
         const header = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
         const hbox = new St.BoxLayout({style_class: 'lp-header', x_expand: true});
-        hbox.add_child(this._icon('airpods', 'lp-header-icon'));
+        hbox.add_child(this._image('earbuds-pair@2x.png', 'lp-header-icon'));
         const titles = new St.BoxLayout({vertical: true, y_align: Clutter.ActorAlign.CENTER});
         this._title = new St.Label({style_class: 'lp-title', text: 'AirPods'});
         this._subtitle = new St.Label({style_class: 'lp-subtitle', text: ''});
@@ -77,26 +88,38 @@ class Indicator extends PanelMenu.Button {
 
         // Battery tiles: left bud, case, right bud.
         const tilesItem = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
-        const tiles = new St.BoxLayout({style_class: 'lp-tiles', x_expand: true, x_align: Clutter.ActorAlign.CENTER});
+        const tiles = new St.BoxLayout({style_class: 'lp-tiles', x_expand: true});
         this._tiles = {
-            Left: this._makeTile('bud-left', 'Left'),
-            Case: this._makeTile('airpods-case', 'Case'),
-            Right: this._makeTile('bud-right', 'Right'),
+            Left: this._makeTile('earbud-left.png', 'Left Earbud', 'L'),
+            Case: this._makeTile('charging-case.png', 'Case'),
+            Right: this._makeTile('earbud-right.png', 'Right Earbud', 'R'),
         };
         for (const t of Object.values(this._tiles)) tiles.add_child(t.actor);
         tilesItem.add_child(tiles);
         this.menu.addMenuItem(tilesItem);
 
-        // Noise control segmented buttons.
+        // Noise control: segmented buttons with an icon above each label.
         const sec = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
         sec.add_child(new St.Label({style_class: 'lp-section', text: 'NOISE CONTROL'}));
         this.menu.addMenuItem(sec);
 
         const modesItem = new PopupMenu.PopupBaseMenuItem({reactive: false, can_focus: false});
-        const modes = new St.BoxLayout({style_class: 'lp-modes', x_expand: true, x_align: Clutter.ActorAlign.CENTER});
-        this._modeButtons = MODES.map(([label, id]) => {
-            const b = new St.Button({style_class: 'lp-mode', label, can_focus: true});
-            b.connect('clicked', () => this._setMode(id));
+        const modes = new St.BoxLayout({style_class: 'lp-modes', x_expand: true});
+        this._modeButtons = MODES.map(m => {
+            const col = new St.BoxLayout({vertical: true, x_align: Clutter.ActorAlign.CENTER});
+            const icon = this._image(m.image, 'lp-mode-icon');
+            icon.x_align = Clutter.ActorAlign.CENTER;
+            const label = new St.Label({style_class: 'lp-mode-label', text: m.label});
+            label.clutter_text.set({
+                line_wrap: true,
+                line_wrap_mode: Pango.WrapMode.WORD_CHAR,
+                ellipsize: Pango.EllipsizeMode.NONE,
+                line_alignment: Pango.Alignment.CENTER,
+            });
+            col.add_child(icon);
+            col.add_child(label);
+            const b = new St.Button({style_class: 'lp-mode', child: col, can_focus: true, x_expand: true});
+            b.connect('clicked', () => this._setMode(m.id));
             modes.add_child(b);
             return b;
         });
@@ -105,24 +128,47 @@ class Indicator extends PanelMenu.Button {
 
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
 
-        this._ca = this._makeSwitch('Conversational Awareness', 'SetConversationalAwareness');
-        this._oneBud = this._makeSwitch('One Bud ANC', 'SetOneBudANCMode');
+        this._ca = this._makeSwitchRow('chat.png', 'Conversational Awareness',
+            'Lowers media volume and enhances voices', 'SetConversationalAwareness', 'lp-row-icon-chat');
+        this._oneBud = this._makeSwitchRow('ear.png', 'One Bud ANC',
+            'Noise cancellation with a single earbud', 'SetOneBudANCMode', 'lp-row-icon-ear');
     }
 
-    _makeSwitch(label, method) {
-        const item = new PopupMenu.PopupSwitchMenuItem(label, false);
-        item.connect('toggled', (_i, state) => {
-            if (!this._updating) this._call(method, new GLib.Variant('(b)', [state]));
+    _makeSwitchRow(iconName, title, description, method, iconClass) {
+        const item = new PopupMenu.PopupBaseMenuItem({style_class: 'popup-menu-item lp-row'});
+        const icon = this._image(iconName, `lp-row-icon ${iconClass}`);
+        icon.set({x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+        const bg = new St.Bin({style_class: 'lp-row-icon-bg', y_align: Clutter.ActorAlign.CENTER,
+            child: icon});
+        const texts = new St.BoxLayout({vertical: true, x_expand: true, y_align: Clutter.ActorAlign.CENTER});
+        texts.add_child(new St.Label({style_class: 'lp-row-title', text: title}));
+        texts.add_child(new St.Label({style_class: 'lp-row-desc', text: description}));
+        const sw = new PopupMenu.Switch(false);
+        sw.y_align = Clutter.ActorAlign.CENTER;
+        item.add_child(bg);
+        item.add_child(texts);
+        item.add_child(sw);
+        item.connect('activate', () => {
+            const next = !sw.state;
+            sw.state = next;
+            this._call(method, new GLib.Variant('(b)', [next]));
         });
+        item.sw = sw;
         this.menu.addMenuItem(item);
         return item;
     }
 
-    _makeTile(iconName, name) {
-        const actor = new St.BoxLayout({style_class: 'lp-tile', vertical: true});
+    _makeTile(imageName, name, badgeText) {
+        const actor = new St.BoxLayout({style_class: 'lp-tile', vertical: true, x_expand: true});
         const center = {x_align: Clutter.ActorAlign.CENTER};
-        const icon = this._icon(iconName, 'lp-tile-icon');
-        icon.set(center);
+        const iconBox = new St.Widget({layout_manager: new Clutter.BinLayout(), style_class: 'lp-tile-icon-box', ...center});
+        const icon = this._image(imageName, 'lp-tile-icon');
+        icon.set({x_align: Clutter.ActorAlign.CENTER, y_align: Clutter.ActorAlign.CENTER});
+        iconBox.add_child(icon);
+        if (badgeText) {
+            iconBox.add_child(new St.Label({style_class: 'lp-badge', text: badgeText,
+                x_align: Clutter.ActorAlign.END, y_align: Clutter.ActorAlign.END}));
+        }
         const pct = new St.Label({style_class: 'lp-tile-pct', text: '–', ...center});
         const bar = new St.Widget({style_class: 'lp-bar', layout_manager: new Clutter.BinLayout(), ...center});
         bar.set_width(BAR_WIDTH);
@@ -130,8 +176,8 @@ class Indicator extends PanelMenu.Button {
         fill.set_width(0);
         bar.add_child(fill);
         const label = new St.Label({style_class: 'lp-tile-name', text: name, ...center});
-        for (const w of [icon, pct, bar, label]) actor.add_child(w);
-        return {actor, pct, fill, label, name};
+        for (const w of [iconBox, pct, bar, label]) actor.add_child(w);
+        return {actor, pct, fill, label};
     }
 
     _refresh() {
@@ -164,7 +210,7 @@ class Indicator extends PanelMenu.Button {
         this._call('SetNoiseControlMode', new GLib.Variant('(i)', [id]));
     }
 
-    _renderTile(key, available, level, charging, inEar) {
+    _renderTile(key, available, level, charging) {
         const t = this._tiles[key];
         t.actor.remove_style_class_name('lp-tile-off');
         if (!available) t.actor.add_style_class_name('lp-tile-off');
@@ -174,7 +220,6 @@ class Indicator extends PanelMenu.Button {
         t.fill.remove_style_class_name('lp-charging');
         if (available && charging) t.fill.add_style_class_name('lp-charging');
         else if (available && level <= LOW_BATTERY) t.fill.add_style_class_name('lp-low');
-        t.label.text = inEar === undefined ? t.name : `${t.name} · ${inEar ? 'in ear' : 'out'}`;
     }
 
     _render() {
@@ -184,26 +229,24 @@ class Indicator extends PanelMenu.Button {
 
         this._panelIcon.opacity = connected ? 255 : 110;
         this._title.text = p.DeviceName ?? 'AirPods';
-        const modeName = MODES.find(([, id]) => id === p.NoiseControlMode)?.[0];
+        const modeName = MODES.find(m => m.id === p.NoiseControlMode)?.label;
         this._subtitle.text = connected ? `Connected${modeName ? ` · ${modeName}` : ''}` : 'Disconnected';
 
-        this._renderTile('Left', connected && p.LeftBatteryAvailable, p.LeftBatteryLevel, p.LeftBatteryCharging, p.LeftPodInEar);
-        this._renderTile('Right', connected && p.RightBatteryAvailable, p.RightBatteryLevel, p.RightBatteryCharging, p.RightPodInEar);
+        this._renderTile('Left', connected && p.LeftBatteryAvailable, p.LeftBatteryLevel, p.LeftBatteryCharging);
+        this._renderTile('Right', connected && p.RightBatteryAvailable, p.RightBatteryLevel, p.RightBatteryCharging);
         this._renderTile('Case', connected && p.CaseBatteryAvailable, p.CaseBatteryLevel, p.CaseBatteryCharging);
 
         this._modeButtons.forEach((b, i) => {
             b.reactive = connected;
             b.opacity = connected ? 255 : 100;
-            if (connected && MODES[i][1] === p.NoiseControlMode) b.add_style_class_name('lp-active');
+            if (connected && MODES[i].id === p.NoiseControlMode) b.add_style_class_name('lp-active');
             else b.remove_style_class_name('lp-active');
         });
 
-        this._updating = true;
-        this._ca.setToggleState(!!p.ConversationalAwareness);
-        this._oneBud.setToggleState(!!p.OneBudANCMode);
+        this._ca.sw.state = !!p.ConversationalAwareness;
+        this._oneBud.sw.state = !!p.OneBudANCMode;
         this._ca.setSensitive(connected);
         this._oneBud.setSensitive(connected);
-        this._updating = false;
 
         const levels = ['Left', 'Right', 'Headset'].filter(n => connected && p[`${n}BatteryAvailable`])
             .map(n => p[`${n}BatteryLevel`]);
@@ -222,7 +265,7 @@ class Indicator extends PanelMenu.Button {
 
 export default class LinuxPodsExtension extends Extension {
     enable() {
-        this._indicator = new Indicator(`${this.path}/icons`);
+        this._indicator = new Indicator(`${this.path}/icons`, `${this.path}/images`);
         Main.panel.addToStatusArea(this.uuid, this._indicator);
     }
 
