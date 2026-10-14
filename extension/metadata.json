@@ -1,0 +1,8 @@
+{
+  "name": "GnomePods",
+  "description": "AirPods battery, case, noise control and more in the GNOME top bar. Needs linuxpods-daemon.",
+  "uuid": "gnomepods@michaelcaxias.github.io",
+  "shell-version": ["50"],
+  "url": "https://github.com/michaelcaxias/gnomepods",
+  "version-name": "1.0.0"
+}

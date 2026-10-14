@@ -1,0 +1,24 @@
+.lp-panel-icon { icon-size: 21px; }
+.lp-header { spacing: 12px; padding: 14px 16px 6px 16px; min-width: 330px; }
+.lp-header-icon { icon-size: 34px; }
+.lp-title { font-weight: bold; font-size: 1.15em; }
+.lp-subtitle { font-size: .9em; color: rgba(255,255,255,.6); }
+
+.lp-tiles { spacing: 8px; padding: 8px 12px; }
+.lp-tile { background-color: rgba(255,255,255,.07); border-radius: 14px; padding: 10px 6px; spacing: 4px; min-width: 92px; }
+.lp-tile-off { opacity: .4; }
+.lp-tile-icon { icon-size: 30px; }
+.lp-tile-pct { font-weight: bold; font-size: 1.1em; }
+.lp-tile-name { font-size: .8em; color: rgba(255,255,255,.6); }
+.lp-bar { background-color: rgba(255,255,255,.18); border-radius: 3px; height: 5px; width: 64px; }
+.lp-bar-fill { background-color: #ffffff; border-radius: 3px; height: 5px; }
+.lp-bar-fill.lp-low { background-color: #f66151; }
+.lp-bar-fill.lp-charging { background-color: #8ff0a4; }
+.lp-ear { font-size: .75em; color: rgba(255,255,255,.55); }
+
+.lp-section { font-size: .8em; font-weight: bold; color: rgba(255,255,255,.55); padding: 10px 16px 0 16px; }
+.lp-modes { spacing: 4px; padding: 6px 12px 10px 12px; }
+.lp-mode { background-color: rgba(255,255,255,.07); border-radius: 12px; padding: 8px 12px; text-align: center; font-size: .85em; }
+.lp-mode:hover { background-color: rgba(255,255,255,.14); }
+.lp-mode.lp-active { background-color: #3584e4; color: #ffffff; font-weight: bold; }
+.lp-mode:insensitive { opacity: .4; }
