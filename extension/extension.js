@@ -23,6 +23,10 @@ const POLL_SECONDS = 10;
 const CALL_TIMEOUT_MS = 3000;
 const BAR_WIDTH = 64;
 const LOW_BATTERY = 20;
+const DAEMON_UNIT = 'linuxpods-daemon.service';
+const HEAL_AFTER_POLLS = 3;
+const HEAL_COOLDOWN_SECONDS = 60;
+const HEAL_MAX_ATTEMPTS = 3;
 
 const Indicator = GObject.registerClass(
 class Indicator extends PanelMenu.Button {
@@ -30,6 +34,9 @@ class Indicator extends PanelMenu.Button {
         super._init(0.0, 'LinuxPods');
         this._destroyed = false;
         this._props = {};
+        this._badPolls = 0;
+        this._healAttempts = 0;
+        this._lastHeal = 0;
         this._iconDir = iconDir;
         this._imageDir = imageDir;
 
@@ -191,11 +198,42 @@ class Indicator extends PanelMenu.Button {
                     const props = {};
                     for (const k in dict) props[k] = dict[k].deepUnpack();
                     this._props = props;
+                    this._trackHealth(this._daemonStalled(props));
                 } catch (_e) {
                     this._props = {};
+                    this._trackHealth(true);
                 }
                 this._render();
             });
+    }
+
+    // Connected but no battery data means the daemon lost its AirPods socket.
+    _daemonStalled(p) {
+        return !!p.Connected && !['Left', 'Right', 'Headset', 'Case'].some(n => p[`${n}BatteryAvailable`]);
+    }
+
+    // The daemon can lose its D-Bus name (session bus restart) or its AirPods
+    // socket and never recover on its own; restart it after a few bad polls.
+    _trackHealth(bad) {
+        if (!bad) {
+            this._badPolls = 0;
+            this._healAttempts = 0;
+            return;
+        }
+        if (++this._badPolls < HEAL_AFTER_POLLS || this._healAttempts >= HEAL_MAX_ATTEMPTS)
+            return;
+        const now = GLib.get_monotonic_time() / 1e6;
+        if (now - this._lastHeal < HEAL_COOLDOWN_SECONDS)
+            return;
+        this._lastHeal = now;
+        this._healAttempts++;
+        try {
+            // try-restart leaves a service the user stopped on purpose alone.
+            Gio.Subprocess.new(['systemctl', '--user', 'try-restart', DAEMON_UNIT],
+                Gio.SubprocessFlags.STDOUT_SILENCE | Gio.SubprocessFlags.STDERR_SILENCE);
+        } catch (e) {
+            logError(e);
+        }
     }
 
     _call(method, params) {

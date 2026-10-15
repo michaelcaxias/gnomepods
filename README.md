@@ -15,6 +15,7 @@ GnomePods is only the GNOME Shell front end. It does not talk to the AirPods its
 - Noise control buttons: Off, Noise Cancel, Transparency, Adaptive
 - Switches for Conversational Awareness and One Bud ANC
 - The icon is always visible and re-reads the daemon every 10 s, so it recovers by itself if the daemon restarts
+- If the daemon loses its D-Bus name or stops getting AirPods data (connected but no battery for ~30 s), the extension runs `systemctl --user try-restart linuxpods-daemon` (at most 3 times, 60 s apart)
 
 ## Requirements
 
